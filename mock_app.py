@@ -60,8 +60,9 @@ def get_trace_id():
 def database_operation():
     """This function now returns True for success and False for failure."""
     with tracer.start_as_current_span("db_query") as db_span:
-        loggers["database"].info("Executing database query", extra={"tags": {"trace_id": get_trace_id()}})
-        time.sleep(random.uniform(0.05, 0.1))
+        db_span.set_attribute("service.name", "database")
+        time.sleep(random.uniform(0.05, 0.15))
+        
         # Simulate occasional DB errors (e.g., 8% chance)
         if random.random() < 0.08:
             db_span.set_status(trace.Status(trace.StatusCode.ERROR, "DB connection failed"))
@@ -71,9 +72,8 @@ def database_operation():
         return True # Indicate success
 
 def backend_process():
-    """This function also returns True/False and has its own failure chance."""
-    with tracer.start_as_current_span("backend_processing") as backend_span:
-        loggers["backend"].info("Processing request in backend", extra={"tags": {"trace_id": get_trace_id()}})
+    with tracer.start_as_current_span("backend_processing", kind=trace.SpanKind.INTERNAL) as backend_span:
+        backend_span.set_attribute("service.name", "backend")
         
         # Independent backend error (e.g., 5% chance of a cache failure)
         if random.random() < 0.05:
@@ -83,34 +83,39 @@ def backend_process():
 
         time.sleep(random.uniform(0.1, 0.3))
         
-        # Call the next service
-        if not database_operation():
-            # The error came from the database, but the backend is also failing because of it.
+        # Call the database
+        db_success = database_operation()
+        if not db_success:
             backend_span.set_status(trace.Status(trace.StatusCode.ERROR, "Downstream DB error"))
             loggers["backend"].error("Backend failed due to downstream DB error", extra={"tags": {"trace_id": get_trace_id()}})
             return False
-
-        loggers["backend"].info("Backend processing successful", extra={"tags": {"trace_id": get_trace_id()}})
+        
+        loggers["backend"].info("Backend processing complete", extra={"tags": {"trace_id": get_trace_id()}})
         return True
 
 def frontend_request():
     # This is the parent span for the entire request
     with tracer.start_as_current_span("/api/users", kind=trace.SpanKind.SERVER) as parent_span:
-        loggers["frontend"].info("Received request for /api/users", extra={"tags": {"trace_id": get_trace_id()}})
-
+        parent_span.set_attribute("service.name", "frontend")
+        trace_id = get_trace_id()
+        loggers["frontend"].info(f"Received request for /api/users", extra={"tags": {"trace_id": trace_id}})
+        
         # Independent frontend error (e.g., 3% chance of a bad request/auth issue)
         if random.random() < 0.03:
             parent_span.set_status(trace.Status(trace.StatusCode.ERROR, "Invalid user session"))
-            loggers["frontend"].error("Invalid user session token", extra={"tags": {"trace_id": get_trace_id()}})
+            loggers["frontend"].error("Invalid user session token", extra={"tags": {"trace_id": trace_id}})
             return # End the request here
 
         # Call the backend service and handle its success/failure response
-        if backend_process():
-            parent_span.set_status(trace.Status(trace.StatusCode.OK))
-            loggers["frontend"].info("Request to /api/users successful", extra={"tags": {"trace_id": get_trace_id()}})
-        else:
-            parent_span.set_status(trace.Status(trace.StatusCode.ERROR, "Request failed in backend"))
-            loggers["frontend"].error("Request to /api/users failed due to backend error", extra={"tags": {"trace_id": get_trace_id()}})
+        backend_success = backend_process()
+        if not backend_success:
+            parent_span.set_status(trace.Status(trace.StatusCode.ERROR, "Backend error"))
+            loggers["frontend"].error("Request to /api/users failed due to backend error", extra={"tags": {"trace_id": trace_id}})
+            return
+        
+        # If we get here, everything succeeded
+        parent_span.set_status(trace.Status(trace.StatusCode.OK))
+        loggers["frontend"].info("Transaction successful", extra={"tags": {"trace_id": trace_id}})
 
 if __name__ == "__main__":
     print("Starting mock application... Press Ctrl+C to stop.")

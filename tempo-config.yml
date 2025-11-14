@@ -13,10 +13,16 @@ distributor:
 storage:
   trace:
     backend: local
-    wal:
-      path: /tmp/tempo/wal
     local:
       path: /tmp/tempo/blocks
+    wal:
+      path: /tmp/tempo/wal
+    block:
+      version: vParquet4
+
+compactor:
+  compaction:
+    block_retention: 48h
 
 ingester:
   lifecycler:
@@ -24,15 +30,24 @@ ingester:
       kvstore:
         store: inmemory
       replication_factor: 1
+  max_block_duration: 5m
 
 metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
   storage:
     path: /tmp/tempo/generator
     remote_write:
       - url: http://prometheus:9090/api/v1/write
         send_exemplars: true
+  processor:
+    local_blocks:
+      flush_to_storage: true
+      max_block_duration: 5m
 
 overrides:
   defaults:
     metrics_generator:
-      processors: [service-graphs, span-metrics, local-blocks]
+      processors: [service-graphs, span-metrics]
+      generate_native_histograms: both
