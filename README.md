@@ -19,9 +19,9 @@ Open [http://localhost:3000](http://localhost:3000)
 
 1. In Grafana, click **+** (top-left) → **Import**
 2. Click **Upload JSON file**
-    - Select `dashboards/System Health.json`
+    - Select `dashboards/System Health Metrics.json`
     - Select `dashboards/Logging dashboard via Loki.json`
-    - Select `dashboards/Trace dashboard via Tempo.json`
+    - Select `dashboards/Distributed Traces Dashboard with Tempo.json`
 4. Click **Load** → **Import**
 
 ### 4. Run the Mock Application
