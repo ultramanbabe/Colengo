@@ -2,6 +2,16 @@
 
 ## Quick Start
 
+### Prerequisites
+
+- Python 3.x and pip installed
+- Docker & Docker Compose installed
+
+> Install Python dependencies for the mock application:
+```sh
+pip install -r requirements.txt
+```
+
 ### 1. Start the Stack
 
 ```sh
@@ -22,14 +32,9 @@ Open [http://localhost:3000](http://localhost:3000)
     - Select `dashboards/System Health Metrics.json`
     - Select `dashboards/Logging dashboard via Loki.json`
     - Select `dashboards/Distributed Traces Dashboard with Tempo.json`
-4. Click **Load** → **Import**
+3. Click **Load** → **Import**
 
 ### 4. Run the Mock Application
-
-Install dependencies:
-```sh
-pip install -r requirements.txt
-```
 
 Run the app:
 ```sh
